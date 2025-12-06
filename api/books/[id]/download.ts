@@ -28,8 +28,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await incrementDownloadCount(book.id);
 
-    if (isSupabaseConfigured) {
-      const fileUrl = getFileUrl(book);
+    if (isSupabaseConfigured()) {
+      const fileUrl = await getFileUrl(book);
       if (fileUrl) {
         return res.redirect(302, fileUrl);
       }

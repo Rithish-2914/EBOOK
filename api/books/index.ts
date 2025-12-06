@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAllBooks, createBook, isSupabaseConfigured } from '../lib/storage';
+import { getAllBooks, isSupabaseConfigured } from '../lib/storage';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,7 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'GET') {
     try {
-      if (!isSupabaseConfigured) {
+      if (!isSupabaseConfigured()) {
         return res.status(200).json([]);
       }
       const books = await getAllBooks();
@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ 
         error: "Failed to fetch books",
         details: error?.message || String(error),
-        supabaseConfigured: isSupabaseConfigured
+        supabaseConfigured: isSupabaseConfigured()
       });
     }
   }

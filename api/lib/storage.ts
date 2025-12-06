@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
 export interface Book {
   id: string;
@@ -19,14 +20,20 @@ export interface InsertBook {
   fileSize: number;
 }
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+function getSupabaseClient(): SupabaseClient | null {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return null;
+  }
+  
+  return createClient(supabaseUrl, supabaseServiceKey);
+}
 
-export const supabase = supabaseUrl && supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey)
-  : null;
-
-export const isSupabaseConfigured = !!supabase;
+export function isSupabaseConfigured(): boolean {
+  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY);
+}
 
 function mapDbBookToBook(dbBook: any): Book {
   return {
@@ -42,6 +49,7 @@ function mapDbBookToBook(dbBook: any): Book {
 }
 
 export async function getAllBooks(): Promise<Book[]> {
+  const supabase = getSupabaseClient();
   if (!supabase) {
     return [];
   }
@@ -57,6 +65,7 @@ export async function getAllBooks(): Promise<Book[]> {
 }
 
 export async function getBook(id: string): Promise<Book | undefined> {
+  const supabase = getSupabaseClient();
   if (!supabase) {
     return undefined;
   }
@@ -76,6 +85,7 @@ export async function getBook(id: string): Promise<Book | undefined> {
 }
 
 export async function createBook(insertBook: InsertBook, fileBuffer?: Buffer): Promise<Book> {
+  const supabase = getSupabaseClient();
   if (!supabase) {
     throw new Error("Supabase not configured");
   }
@@ -117,6 +127,7 @@ export async function createBook(insertBook: InsertBook, fileBuffer?: Buffer): P
 }
 
 export async function incrementDownloadCount(id: string): Promise<void> {
+  const supabase = getSupabaseClient();
   if (!supabase) return;
   
   const { error } = await supabase.rpc("increment_download_count", {
@@ -125,7 +136,7 @@ export async function incrementDownloadCount(id: string): Promise<void> {
   
   if (error) {
     const book = await getBook(id);
-    if (book) {
+    if (book && supabase) {
       await supabase
         .from("books")
         .update({ download_count: (book.downloadCount || 0) + 1 })
@@ -135,6 +146,7 @@ export async function incrementDownloadCount(id: string): Promise<void> {
 }
 
 export async function deleteBook(id: string): Promise<boolean> {
+  const supabase = getSupabaseClient();
   if (!supabase) return false;
   
   const book = await getBook(id);
@@ -156,7 +168,8 @@ export async function deleteBook(id: string): Promise<boolean> {
   return !error;
 }
 
-export function getFileUrl(book: Book): string | null {
+export async function getFileUrl(book: Book): Promise<string | null> {
+  const supabase = getSupabaseClient();
   if (!supabase || !book.filePath) return null;
   
   const { data } = supabase.storage
