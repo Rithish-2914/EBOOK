@@ -3,6 +3,7 @@ import { Upload, FileText, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -11,14 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { CATEGORIES } from "@shared/schema";
 
 interface UploadModalProps {
   onUpload: (data: FormData) => Promise<void>;
@@ -36,7 +29,6 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +36,6 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
     setTitle("");
     setAuthor("");
     setDescription("");
-    setCategory("");
     setFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -53,14 +44,13 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !title || !author || !category) return;
+    if (!file || !title || !author) return;
 
     const formData = new FormData();
     formData.append("file", file);
     formData.append("title", title);
     formData.append("author", author);
     formData.append("description", description);
-    formData.append("category", category);
 
     await onUpload(formData);
     resetForm();
@@ -82,7 +72,7 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
     }
   };
 
-  const isValid = title && author && category && file;
+  const isValid = title && author && file;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -95,6 +85,9 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Upload New Book</DialogTitle>
+          <DialogDescription>
+            Add a PDF book to the library. Fill in the details below.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div
@@ -169,22 +162,6 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
               required
               data-testid="input-author"
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="category">Category *</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger data-testid="select-category">
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">

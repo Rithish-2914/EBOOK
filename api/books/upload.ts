@@ -27,9 +27,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { title, author, description, category, fileName, fileSize, fileData } = req.body;
+    const { title, author, description, fileName, fileSize, fileData } = req.body;
 
-    if (!title || !author || !category || !fileName || !fileSize) {
+    if (!title || !author || !fileName || !fileSize) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -43,7 +43,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title,
         author,
         description: description || null,
-        category,
         fileName,
         fileSize,
       },

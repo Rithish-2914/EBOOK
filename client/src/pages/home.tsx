@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Header } from "@/components/header";
 import { HeroSection } from "@/components/hero-section";
-import { CategoryFilter } from "@/components/category-filter";
 import { BookGrid } from "@/components/book-grid";
 import { Footer } from "@/components/footer";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +10,6 @@ import type { Book } from "@shared/schema";
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: books = [], isLoading } = useQuery<Book[]>({
@@ -77,23 +75,15 @@ export default function Home() {
   };
 
   const filteredBooks = useMemo(() => {
-    let result = books;
-
-    if (selectedCategory) {
-      result = result.filter((book) => book.category === selectedCategory);
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (book) =>
-          book.title.toLowerCase().includes(query) ||
-          book.author.toLowerCase().includes(query)
-      );
-    }
-
-    return result;
-  }, [books, selectedCategory, searchQuery]);
+    if (!searchQuery.trim()) return books;
+    
+    const query = searchQuery.toLowerCase();
+    return books.filter(
+      (book) =>
+        book.title.toLowerCase().includes(query) ||
+        book.author.toLowerCase().includes(query)
+    );
+  }, [books, searchQuery]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -112,19 +102,9 @@ export default function Home() {
         />
         
         <section className="max-w-7xl mx-auto px-6 md:px-12 py-8 md:py-12">
-          <div className="mb-8">
-            <h2 className="text-2xl md:text-3xl font-semibold mb-4">
-              Browse by Category
-            </h2>
-            <CategoryFilter
-              selectedCategory={selectedCategory}
-              onSelectCategory={setSelectedCategory}
-            />
-          </div>
-          
           <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-xl md:text-2xl font-semibold">
-              {selectedCategory ? selectedCategory : "All Books"}
+              All Books
               <span className="text-muted-foreground font-normal ml-2">
                 ({filteredBooks.length})
               </span>

@@ -55,13 +55,12 @@ export async function registerRoutes(
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const { title, author, description, category } = req.body;
+      const { title, author, description } = req.body;
 
       const parseResult = insertBookSchema.safeParse({
         title,
         author,
         description: description || null,
-        category,
         fileName: req.file.originalname,
         fileSize: req.file.size,
       });

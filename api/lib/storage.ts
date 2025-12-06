@@ -5,7 +5,6 @@ export interface Book {
   title: string;
   author: string;
   description: string | null;
-  category: string;
   fileName: string;
   fileSize: number;
   filePath: string | null;
@@ -16,7 +15,6 @@ export interface InsertBook {
   title: string;
   author: string;
   description?: string | null;
-  category: string;
   fileName: string;
   fileSize: number;
 }
@@ -36,7 +34,6 @@ function mapDbBookToBook(dbBook: any): Book {
     title: dbBook.title,
     author: dbBook.author,
     description: dbBook.description,
-    category: dbBook.category,
     fileName: dbBook.file_name,
     fileSize: dbBook.file_size,
     filePath: dbBook.file_path,
@@ -106,7 +103,6 @@ export async function createBook(insertBook: InsertBook, fileBuffer?: Buffer): P
       title: insertBook.title,
       author: insertBook.author,
       description: insertBook.description,
-      category: insertBook.category,
       file_name: insertBook.fileName,
       file_size: insertBook.fileSize,
       file_path: filePath,
