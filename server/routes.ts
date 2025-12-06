@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { isSupabaseConfigured } from "./supabase";
 import multer from "multer";
 import { insertBookSchema } from "@shared/schema";
 
@@ -28,6 +29,7 @@ export async function registerRoutes(
       const books = await storage.getAllBooks();
       res.json(books);
     } catch (error) {
+      console.error("Get books error:", error);
       res.status(500).json({ error: "Failed to fetch books" });
     }
   });
@@ -41,6 +43,7 @@ export async function registerRoutes(
       }
       res.json(book);
     } catch (error) {
+      console.error("Get book error:", error);
       res.status(500).json({ error: "Failed to fetch book" });
     }
   });
@@ -67,10 +70,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: parseResult.error.message });
       }
 
-      const book = await storage.createBook(parseResult.data);
-      
-      // Store the file buffer in memory
-      storage.storeFile(book.id, req.file.buffer);
+      const book = await storage.createBook(parseResult.data, req.file.buffer);
 
       res.status(201).json(book);
     } catch (error) {
@@ -87,13 +87,23 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Book not found" });
       }
 
-      const fileBuffer = storage.getFile(book.id);
-      if (!fileBuffer) {
+      // Increment download count
+      await storage.incrementDownloadCount(book.id);
+
+      // If using Supabase, redirect to the file URL
+      if (isSupabaseConfigured) {
+        const fileUrl = storage.getFileUrl(book);
+        if (fileUrl) {
+          return res.redirect(fileUrl);
+        }
         return res.status(404).json({ error: "File not found" });
       }
 
-      // Increment download count
-      await storage.incrementDownloadCount(book.id);
+      // For in-memory storage, return the buffer
+      const fileBuffer = storage.getFileBuffer(book.id);
+      if (!fileBuffer) {
+        return res.status(404).json({ error: "File not found" });
+      }
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
@@ -102,6 +112,7 @@ export async function registerRoutes(
       );
       res.send(fileBuffer);
     } catch (error) {
+      console.error("Download error:", error);
       res.status(500).json({ error: "Failed to download book" });
     }
   });
@@ -115,8 +126,17 @@ export async function registerRoutes(
       }
       res.status(204).send();
     } catch (error) {
+      console.error("Delete error:", error);
       res.status(500).json({ error: "Failed to delete book" });
     }
+  });
+
+  // Health check endpoint for deployment
+  app.get("/api/health", (_req, res) => {
+    res.json({ 
+      status: "ok", 
+      storage: isSupabaseConfigured ? "supabase" : "in-memory" 
+    });
   });
 
   return httpServer;
