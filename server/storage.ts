@@ -56,7 +56,7 @@ export class MemStorage implements IStorage {
 
   async createBook(insertBook: InsertBook, fileBuffer?: Buffer): Promise<Book> {
     const id = randomUUID();
-    const book: Book = { ...insertBook, id, downloadCount: 0 };
+    const book: Book = { ...insertBook, id, filePath: null, downloadCount: 0 };
     this.books.set(id, book);
     if (fileBuffer) {
       this.fileStore.set(id, fileBuffer);
@@ -88,8 +88,10 @@ export class MemStorage implements IStorage {
 }
 
 // Supabase storage (for production)
+// NOTE: User storage remains in-memory as this ebook library is public and doesn't require user auth.
+// If auth is needed in the future, add a users table to Supabase and implement persistence here.
 export class SupabaseStorage implements IStorage {
-  private users: Map<string, User> = new Map(); // Keep users in memory for now
+  private users: Map<string, User> = new Map();
 
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
@@ -206,12 +208,14 @@ export class SupabaseStorage implements IStorage {
     const book = await this.getBook(id);
     if (!book) return false;
     
-    // Delete file from storage
-    const { error: storageError } = await supabase.storage
-      .from("ebooks")
-      .remove([`${id}_${book.fileName}`]);
-    
-    if (storageError) console.error("Storage delete error:", storageError);
+    // Delete file from storage using the stored file_path
+    if (book.filePath) {
+      const { error: storageError } = await supabase.storage
+        .from("ebooks")
+        .remove([book.filePath]);
+      
+      if (storageError) console.error("Storage delete error:", storageError);
+    }
     
     // Delete book record
     const { error } = await supabase
@@ -223,11 +227,11 @@ export class SupabaseStorage implements IStorage {
   }
 
   getFileUrl(book: Book): string | null {
-    if (!supabase) return null;
+    if (!supabase || !book.filePath) return null;
     
     const { data } = supabase.storage
       .from("ebooks")
-      .getPublicUrl(`${book.id}_${book.fileName}`);
+      .getPublicUrl(book.filePath);
     
     return data.publicUrl;
   }
@@ -246,6 +250,7 @@ export class SupabaseStorage implements IStorage {
       category: dbBook.category,
       fileName: dbBook.file_name,
       fileSize: dbBook.file_size,
+      filePath: dbBook.file_path,
       downloadCount: dbBook.download_count,
     };
   }

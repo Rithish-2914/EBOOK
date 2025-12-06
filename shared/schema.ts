@@ -44,11 +44,13 @@ export const books = pgTable("books", {
   category: text("category").notNull(),
   fileName: text("file_name").notNull(),
   fileSize: integer("file_size").notNull(),
+  filePath: text("file_path"),
   downloadCount: integer("download_count").default(0),
 });
 
 export const insertBookSchema = createInsertSchema(books).omit({
   id: true,
+  filePath: true,
   downloadCount: true,
 });
 
