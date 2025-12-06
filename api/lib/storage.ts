@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import crypto from "crypto";
+import { randomUUID } from "crypto";
 
 export interface Book {
   id: string;
@@ -20,7 +20,11 @@ export interface InsertBook {
   fileSize: number;
 }
 
+let supabaseClient: SupabaseClient | null = null;
+
 function getSupabaseClient(): SupabaseClient | null {
+  if (supabaseClient) return supabaseClient;
+  
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
   
@@ -28,7 +32,8 @@ function getSupabaseClient(): SupabaseClient | null {
     return null;
   }
   
-  return createClient(supabaseUrl, supabaseServiceKey);
+  supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+  return supabaseClient;
 }
 
 export function isSupabaseConfigured(): boolean {
@@ -90,7 +95,7 @@ export async function createBook(insertBook: InsertBook, fileBuffer?: Buffer): P
     throw new Error("Supabase not configured");
   }
   
-  const id = crypto.randomUUID();
+  const id = randomUUID();
   let filePath = "";
   
   if (fileBuffer) {
