@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createBook, isSupabaseConfigured } from '../lib/storage';
+import { createBook, isSupabaseConfigured } from '../lib/storage.js';
 
 export const config = {
   api: {
