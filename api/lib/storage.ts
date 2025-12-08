@@ -46,28 +46,38 @@ export async function createBook(
 
   let thumbnailPath: string | null = null;
   if (thumbnailBuffer) {
-    thumbnailPath = `thumbnails/${bookId}.jpg`;
-    await supabase.storage
+    thumbnailPath = `thumbnails/${bookId}.png`;
+    const { error: thumbError } = await supabase.storage
       .from('ebooks')
       .upload(thumbnailPath, thumbnailBuffer, {
-        contentType: 'image/jpeg',
+        contentType: 'image/png',
         upsert: false,
       });
+    if (thumbError) {
+      console.error('Thumbnail upload failed:', thumbError);
+      thumbnailPath = null;
+    }
+  }
+
+  const insertData: any = {
+    id: bookId,
+    title: data.title,
+    author: data.author,
+    description: data.description,
+    category: data.category,
+    file_name: data.fileName,
+    file_size: data.fileSize,
+    file_path: filePath,
+    download_count: 0,
+  };
+  
+  if (thumbnailPath) {
+    insertData.thumbnail_path = thumbnailPath;
   }
 
   const { data: book, error: insertError } = await supabase
     .from('books')
-    .insert({
-      id: bookId,
-      title: data.title,
-      author: data.author,
-      description: data.description,
-      category: data.category,
-      file_name: data.fileName,
-      file_size: data.fileSize,
-      file_path: filePath,
-      download_count: 0,
-    })
+    .insert(insertData)
     .select()
     .single();
 
@@ -101,17 +111,25 @@ export async function getAllBooks() {
     throw new Error(`Failed to fetch books: ${error.message}`);
   }
 
-  return books.map((book: any) => ({
-    id: book.id,
-    title: book.title,
-    author: book.author,
-    description: book.description,
-    category: book.category,
-    fileName: book.file_name,
-    fileSize: book.file_size,
-    downloadCount: book.download_count,
-    filePath: book.file_path,
-  }));
+  return books.map((book: any) => {
+    let thumbnailUrl = null;
+    if (book.thumbnail_path) {
+      const { data } = supabase.storage.from('ebooks').getPublicUrl(book.thumbnail_path);
+      thumbnailUrl = data.publicUrl;
+    }
+    return {
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      description: book.description,
+      category: book.category,
+      fileName: book.file_name,
+      fileSize: book.file_size,
+      downloadCount: book.download_count,
+      filePath: book.file_path,
+      thumbnailUrl,
+    };
+  });
 }
 
 export async function getBook(id: string) {
