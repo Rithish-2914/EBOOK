@@ -1,13 +1,58 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import formidable from 'formidable';
 import { createBook, isSupabaseConfigured } from '../lib/storage.js';
+import { readFileSync } from 'fs';
 
 export const config = {
   api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
+    bodyParser: false,
   },
 };
+
+interface ParsedFormData {
+  fields: {
+    title?: string;
+    author?: string;
+    description?: string;
+  };
+  file?: {
+    filepath: string;
+    originalFilename: string;
+    size: number;
+  };
+}
+
+async function parseFormData(req: VercelRequest): Promise<ParsedFormData> {
+  return new Promise((resolve, reject) => {
+    const form = formidable({
+      maxFileSize: 50 * 1024 * 1024,
+      keepExtensions: true,
+    });
+
+    form.parse(req, (err, fields, files) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      const fileArray = files.file;
+      const file = Array.isArray(fileArray) ? fileArray[0] : fileArray;
+
+      resolve({
+        fields: {
+          title: Array.isArray(fields.title) ? fields.title[0] : fields.title,
+          author: Array.isArray(fields.author) ? fields.author[0] : fields.author,
+          description: Array.isArray(fields.description) ? fields.description[0] : fields.description,
+        },
+        file: file ? {
+          filepath: file.filepath,
+          originalFilename: file.originalFilename || 'unknown.pdf',
+          size: file.size,
+        } : undefined,
+      });
+    });
+  });
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,24 +72,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { title, author, description, fileName, fileSize, fileData } = req.body;
+    const { fields, file } = await parseFormData(req);
+    
+    const title = fields.title;
+    const author = fields.author;
+    const description = fields.description;
 
-    if (!title || !author || !fileName || !fileSize) {
-      return res.status(400).json({ error: "Missing required fields" });
+    if (!title || !author) {
+      return res.status(400).json({ error: "Missing required fields: title and author are required" });
     }
 
-    let fileBuffer: Buffer | undefined;
-    if (fileData) {
-      fileBuffer = Buffer.from(fileData, 'base64');
+    if (!file) {
+      return res.status(400).json({ error: "No file uploaded" });
     }
+
+    const fileBuffer = readFileSync(file.filepath);
 
     const book = await createBook(
       {
         title,
         author,
         description: description || null,
-        fileName,
-        fileSize,
+        fileName: file.originalFilename,
+        fileSize: file.size,
       },
       fileBuffer
     );
