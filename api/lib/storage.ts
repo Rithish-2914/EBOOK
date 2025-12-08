@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'node:crypto';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
@@ -112,7 +113,7 @@ export async function getAllBooks() {
   }
 
   return books.map((book: any) => {
-    let thumbnailUrl = null;
+    let thumbnailUrl: string | null = null;
     if (book.thumbnail_path) {
       const { data } = supabase.storage.from('ebooks').getPublicUrl(book.thumbnail_path);
       thumbnailUrl = data.publicUrl;
