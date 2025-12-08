@@ -56,7 +56,13 @@ export class MemStorage implements IStorage {
 
   async createBook(insertBook: InsertBook, fileBuffer?: Buffer): Promise<Book> {
     const id = randomUUID();
-    const book: Book = { ...insertBook, id, filePath: null, downloadCount: 0 };
+    const book: Book = { 
+      ...insertBook, 
+      id, 
+      description: insertBook.description ?? null,
+      filePath: null, 
+      downloadCount: 0 
+    };
     this.books.set(id, book);
     if (fileBuffer) {
       this.fileStore.set(id, fileBuffer);
