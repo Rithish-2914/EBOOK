@@ -1,13 +1,7 @@
 import { Code2 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
-import { UploadModal } from "./upload-modal";
 
-interface HeaderProps {
-  onUpload: (data: FormData) => Promise<void>;
-  isUploading: boolean;
-}
-
-export function Header({ onUpload, isUploading }: HeaderProps) {
+export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-6 md:px-12 h-16 md:h-20 flex items-center justify-between gap-4">
@@ -22,7 +16,6 @@ export function Header({ onUpload, isUploading }: HeaderProps) {
         
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <UploadModal onUpload={onUpload} isUploading={isUploading} />
         </div>
       </div>
     </header>
