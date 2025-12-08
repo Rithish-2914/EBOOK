@@ -1,10 +1,11 @@
 import { Download, FileText } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { Book } from "@shared/schema";
 
 interface BookCardProps {
-  book: Book;
+  book: Book & { thumbnailUrl?: string | null };
   onDownload: (book: Book) => void;
 }
 
@@ -20,13 +21,22 @@ export function BookCard({ book, onDownload }: BookCardProps) {
       className="group flex flex-col overflow-visible transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
       data-testid={`card-book-${book.id}`}
     >
-      <div className="aspect-[2/3] bg-gradient-to-br from-primary/20 via-primary/10 to-accent flex items-center justify-center rounded-t-lg border-b border-border">
-        <div className="flex flex-col items-center gap-3 p-4 text-center">
-          <FileText className="h-12 w-12 text-primary/60" />
-          <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
-            PDF
-          </span>
-        </div>
+      <div className="aspect-[2/3] bg-gradient-to-br from-primary/20 via-primary/10 to-accent flex items-center justify-center rounded-t-lg border-b border-border overflow-hidden">
+        {book.thumbnailUrl ? (
+          <img 
+            src={book.thumbnailUrl} 
+            alt={`Cover of ${book.title}`}
+            className="w-full h-full object-cover"
+            data-testid={`img-book-cover-${book.id}`}
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-3 p-4 text-center">
+            <FileText className="h-12 w-12 text-primary/60" />
+            <span className="font-mono text-xs text-muted-foreground uppercase tracking-wider">
+              PDF
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col flex-1 p-4 gap-3">
@@ -43,7 +53,10 @@ export function BookCard({ book, onDownload }: BookCardProps) {
           </p>
         </div>
 
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <Badge variant="secondary" className="text-xs">
+            {book.category}
+          </Badge>
           <span className="text-xs text-muted-foreground font-mono">
             {formatFileSize(book.fileSize)}
           </span>

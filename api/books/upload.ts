@@ -21,6 +21,9 @@ interface ParsedFormData {
     originalFilename: string;
     size: number;
   };
+  thumbnail?: {
+    filepath: string;
+  };
 }
 
 async function parseFormData(req: VercelRequest): Promise<ParsedFormData> {
@@ -39,6 +42,9 @@ async function parseFormData(req: VercelRequest): Promise<ParsedFormData> {
       const fileArray = files.file;
       const file = Array.isArray(fileArray) ? fileArray[0] : fileArray;
 
+      const thumbnailArray = files.thumbnail;
+      const thumbnail = Array.isArray(thumbnailArray) ? thumbnailArray[0] : thumbnailArray;
+
       resolve({
         fields: {
           title: Array.isArray(fields.title) ? fields.title[0] : fields.title,
@@ -50,6 +56,9 @@ async function parseFormData(req: VercelRequest): Promise<ParsedFormData> {
           filepath: file.filepath,
           originalFilename: file.originalFilename || 'unknown.pdf',
           size: file.size,
+        } : undefined,
+        thumbnail: thumbnail ? {
+          filepath: thumbnail.filepath,
         } : undefined,
       });
     });
@@ -74,7 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { fields, file } = await parseFormData(req);
+    const { fields, file, thumbnail } = await parseFormData(req);
     
     const title = fields.title;
     const author = fields.author;
@@ -90,6 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const fileBuffer = readFileSync(file.filepath);
+    const thumbnailBuffer = thumbnail ? readFileSync(thumbnail.filepath) : undefined;
 
     const book = await createBook(
       {
@@ -100,7 +110,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fileName: file.originalFilename,
         fileSize: file.size,
       },
-      fileBuffer
+      fileBuffer,
+      thumbnailBuffer
     );
 
     return res.status(201).json(book);

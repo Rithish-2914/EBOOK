@@ -26,12 +26,14 @@ export const books = pgTable("books", {
   fileName: text("file_name").notNull(),
   fileSize: integer("file_size").notNull(),
   filePath: text("file_path"),
+  thumbnailPath: text("thumbnail_path"),
   downloadCount: integer("download_count").default(0),
 });
 
 export const insertBookSchema = createInsertSchema(books).omit({
   id: true,
   filePath: true,
+  thumbnailPath: true,
   downloadCount: true,
 });
 

@@ -9,7 +9,7 @@ export interface IStorage {
   
   getAllBooks(): Promise<Book[]>;
   getBook(id: string): Promise<Book | undefined>;
-  createBook(book: InsertBook, fileBuffer?: Buffer): Promise<Book>;
+  createBook(book: InsertBook, fileBuffer?: Buffer, thumbnailBuffer?: Buffer): Promise<Book>;
   incrementDownloadCount(id: string): Promise<void>;
   deleteBook(id: string): Promise<boolean>;
   
@@ -54,20 +54,27 @@ export class MemStorage implements IStorage {
     return this.books.get(id);
   }
 
-  async createBook(insertBook: InsertBook, fileBuffer?: Buffer): Promise<Book> {
+  async createBook(insertBook: InsertBook, fileBuffer?: Buffer, thumbnailBuffer?: Buffer): Promise<Book> {
     const id = randomUUID();
     const book: Book = { 
       ...insertBook, 
       id, 
       description: insertBook.description ?? null,
       filePath: null, 
+      thumbnailPath: null,
       downloadCount: 0 
     };
     this.books.set(id, book);
     if (fileBuffer) {
       this.fileStore.set(id, fileBuffer);
     }
-    return book;
+    if (thumbnailBuffer) {
+      this.fileStore.set(`${id}_thumb`, thumbnailBuffer);
+    }
+    return {
+      ...book,
+      thumbnailUrl: thumbnailBuffer ? `data:image/png;base64,${thumbnailBuffer.toString('base64')}` : null,
+    } as Book & { thumbnailUrl: string | null };
   }
 
   async incrementDownloadCount(id: string): Promise<void> {
@@ -146,11 +153,12 @@ export class SupabaseStorage implements IStorage {
     return data ? this.mapDbBookToBook(data) : undefined;
   }
 
-  async createBook(insertBook: InsertBook, fileBuffer?: Buffer): Promise<Book> {
+  async createBook(insertBook: InsertBook, fileBuffer?: Buffer, thumbnailBuffer?: Buffer): Promise<Book> {
     if (!supabase) throw new Error("Supabase not configured");
     
     const id = randomUUID();
     let filePath = "";
+    let thumbnailPath = "";
     
     // Upload file to Supabase Storage
     if (fileBuffer) {
@@ -166,6 +174,21 @@ export class SupabaseStorage implements IStorage {
       filePath = fileName;
     }
     
+    // Upload thumbnail to Supabase Storage
+    if (thumbnailBuffer) {
+      const thumbName = `thumbnails/${id}_thumb.png`;
+      const { error: thumbError } = await supabase.storage
+        .from("ebooks")
+        .upload(thumbName, thumbnailBuffer, {
+          contentType: "image/png",
+          upsert: false,
+        });
+      
+      if (!thumbError) {
+        thumbnailPath = thumbName;
+      }
+    }
+    
     // Insert book record
     const { data, error } = await supabase
       .from("books")
@@ -178,6 +201,7 @@ export class SupabaseStorage implements IStorage {
         file_name: insertBook.fileName,
         file_size: insertBook.fileSize,
         file_path: filePath,
+        thumbnail_path: thumbnailPath || null,
         download_count: 0,
       })
       .select()
@@ -247,7 +271,15 @@ export class SupabaseStorage implements IStorage {
     return undefined;
   }
 
-  private mapDbBookToBook(dbBook: any): Book {
+  private mapDbBookToBook(dbBook: any): Book & { thumbnailUrl: string | null } {
+    let thumbnailUrl = null;
+    if (supabase && dbBook.thumbnail_path) {
+      const { data } = supabase.storage
+        .from("ebooks")
+        .getPublicUrl(dbBook.thumbnail_path);
+      thumbnailUrl = data.publicUrl;
+    }
+    
     return {
       id: dbBook.id,
       title: dbBook.title,
@@ -257,6 +289,8 @@ export class SupabaseStorage implements IStorage {
       fileName: dbBook.file_name,
       fileSize: dbBook.file_size,
       filePath: dbBook.file_path,
+      thumbnailPath: dbBook.thumbnail_path,
+      thumbnailUrl,
       downloadCount: dbBook.download_count,
     };
   }

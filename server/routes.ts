@@ -10,14 +10,12 @@ const upload = multer({
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
-      cb(null, true);
-    } else {
-      cb(new Error("Only PDF files are allowed"));
-    }
-  },
 });
+
+const uploadFields = upload.fields([
+  { name: "file", maxCount: 1 },
+  { name: "thumbnail", maxCount: 1 },
+]);
 
 export async function registerRoutes(
   httpServer: Server,
@@ -49,27 +47,40 @@ export async function registerRoutes(
   });
 
   // Upload a book
-  app.post("/api/books/upload", upload.single("file"), async (req, res) => {
+  app.post("/api/books/upload", uploadFields, async (req, res) => {
     try {
-      if (!req.file) {
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const pdfFile = files?.file?.[0];
+      const thumbnailFile = files?.thumbnail?.[0];
+
+      if (!pdfFile) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const { title, author, description } = req.body;
+      if (pdfFile.mimetype !== "application/pdf") {
+        return res.status(400).json({ error: "Only PDF files are allowed" });
+      }
+
+      const { title, author, description, category } = req.body;
 
       const parseResult = insertBookSchema.safeParse({
         title,
         author,
         description: description || null,
-        fileName: req.file.originalname,
-        fileSize: req.file.size,
+        category,
+        fileName: pdfFile.originalname,
+        fileSize: pdfFile.size,
       });
 
       if (!parseResult.success) {
         return res.status(400).json({ error: parseResult.error.message });
       }
 
-      const book = await storage.createBook(parseResult.data, req.file.buffer);
+      const book = await storage.createBook(
+        parseResult.data, 
+        pdfFile.buffer, 
+        thumbnailFile?.buffer
+      );
 
       res.status(201).json(book);
     } catch (error) {

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Upload, FileText, X } from "lucide-react";
 import {
   Dialog,
@@ -19,6 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import * as pdfjsLib from "pdfjs-dist";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface UploadModalProps {
   onUpload: (data: FormData) => Promise<void>;
@@ -46,6 +49,39 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
+async function generateThumbnail(file: File): Promise<Blob | null> {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+    
+    const scale = 1.5;
+    const viewport = page.getViewport({ scale });
+    
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    
+    await page.render({
+      canvasContext: context,
+      viewport: viewport,
+      canvas: canvas,
+    } as any).promise;
+    
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, "image/png", 0.9);
+    });
+  } catch (error) {
+    console.error("Failed to generate thumbnail:", error);
+    return null;
+  }
+}
+
 export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -53,7 +89,18 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [thumbnail, setThumbnail] = useState<Blob | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (thumbnailUrl) {
+        URL.revokeObjectURL(thumbnailUrl);
+      }
+    };
+  }, [thumbnailUrl]);
 
   const resetForm = () => {
     setTitle("");
@@ -61,6 +108,11 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
     setDescription("");
     setCategory("");
     setFile(null);
+    setThumbnail(null);
+    if (thumbnailUrl) {
+      URL.revokeObjectURL(thumbnailUrl);
+    }
+    setThumbnailUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -76,25 +128,53 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
     formData.append("author", author);
     formData.append("description", description);
     formData.append("category", category);
+    
+    if (thumbnail) {
+      formData.append("thumbnail", thumbnail, "thumbnail.png");
+    }
 
     await onUpload(formData);
     resetForm();
     setOpen(false);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
+  const handleFileSelect = async (selectedFile: File) => {
     if (selectedFile && selectedFile.type === "application/pdf") {
       setFile(selectedFile);
+      setIsGeneratingThumbnail(true);
+      
+      const thumb = await generateThumbnail(selectedFile);
+      if (thumb) {
+        setThumbnail(thumb);
+        const url = URL.createObjectURL(thumb);
+        setThumbnailUrl(url);
+      }
+      setIsGeneratingThumbnail(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      handleFileSelect(selectedFile);
     }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && droppedFile.type === "application/pdf") {
-      setFile(droppedFile);
+    if (droppedFile) {
+      handleFileSelect(droppedFile);
     }
+  };
+
+  const clearFile = () => {
+    setFile(null);
+    setThumbnail(null);
+    if (thumbnailUrl) {
+      URL.revokeObjectURL(thumbnailUrl);
+    }
+    setThumbnailUrl(null);
   };
 
   const isValid = title && author && category && file;
@@ -116,25 +196,41 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
               file ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50"
             }`}
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop}
           >
             {file ? (
-              <div className="flex items-center justify-center gap-3">
-                <FileText className="h-8 w-8 text-primary" />
-                <div className="text-left">
-                  <p className="font-medium text-sm">{file.name}</p>
+              <div className="flex items-center gap-4">
+                {isGeneratingThumbnail ? (
+                  <div className="w-20 h-28 bg-muted rounded flex items-center justify-center">
+                    <span className="text-xs text-muted-foreground">Loading...</span>
+                  </div>
+                ) : thumbnailUrl ? (
+                  <img 
+                    src={thumbnailUrl} 
+                    alt="PDF preview" 
+                    className="w-20 h-auto rounded shadow-sm"
+                  />
+                ) : (
+                  <div className="w-20 h-28 bg-muted rounded flex items-center justify-center">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-sm truncate">{file.name}</p>
                   <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
+                  {thumbnailUrl && (
+                    <p className="text-xs text-green-600 mt-1">Preview generated</p>
+                  )}
                 </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="ml-2"
-                  onClick={() => setFile(null)}
+                  onClick={clearFile}
                   data-testid="button-remove-file"
                 >
                   <X className="h-4 w-4" />
@@ -229,7 +325,7 @@ export function UploadModal({ onUpload, isUploading }: UploadModalProps) {
             </Button>
             <Button
               type="submit"
-              disabled={!isValid || isUploading}
+              disabled={!isValid || isUploading || isGeneratingThumbnail}
               data-testid="button-submit-upload"
             >
               {isUploading ? "Uploading..." : "Upload Book"}

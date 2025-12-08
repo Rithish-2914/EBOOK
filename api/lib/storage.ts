@@ -10,6 +10,8 @@ export interface Book {
   fileName: string;
   fileSize: number;
   filePath: string | null;
+  thumbnailPath: string | null;
+  thumbnailUrl?: string | null;
   downloadCount: number | null;
 }
 
@@ -43,6 +45,15 @@ export function isSupabaseConfigured(): boolean {
 }
 
 function mapDbBookToBook(dbBook: any): Book {
+  const supabase = getSupabaseClient();
+  let thumbnailUrl: string | null = null;
+  if (supabase && dbBook.thumbnail_path) {
+    const { data } = supabase.storage
+      .from("ebooks")
+      .getPublicUrl(dbBook.thumbnail_path);
+    thumbnailUrl = data.publicUrl;
+  }
+  
   return {
     id: dbBook.id,
     title: dbBook.title,
@@ -52,6 +63,8 @@ function mapDbBookToBook(dbBook: any): Book {
     fileName: dbBook.file_name,
     fileSize: dbBook.file_size,
     filePath: dbBook.file_path,
+    thumbnailPath: dbBook.thumbnail_path,
+    thumbnailUrl,
     downloadCount: dbBook.download_count,
   };
 }
@@ -92,7 +105,7 @@ export async function getBook(id: string): Promise<Book | undefined> {
   return data ? mapDbBookToBook(data) : undefined;
 }
 
-export async function createBook(insertBook: InsertBook, fileBuffer?: Buffer): Promise<Book> {
+export async function createBook(insertBook: InsertBook, fileBuffer?: Buffer, thumbnailBuffer?: Buffer): Promise<Book> {
   const supabase = getSupabaseClient();
   if (!supabase) {
     throw new Error("Supabase not configured");
@@ -100,6 +113,7 @@ export async function createBook(insertBook: InsertBook, fileBuffer?: Buffer): P
   
   const id = randomUUID();
   let filePath = "";
+  let thumbnailPath = "";
   
   if (fileBuffer) {
     const fileName = `${id}_${insertBook.fileName}`;
@@ -114,6 +128,20 @@ export async function createBook(insertBook: InsertBook, fileBuffer?: Buffer): P
     filePath = fileName;
   }
   
+  if (thumbnailBuffer) {
+    const thumbName = `thumbnails/${id}_thumb.png`;
+    const { error: thumbError } = await supabase.storage
+      .from("ebooks")
+      .upload(thumbName, thumbnailBuffer, {
+        contentType: "image/png",
+        upsert: false,
+      });
+    
+    if (!thumbError) {
+      thumbnailPath = thumbName;
+    }
+  }
+  
   const { data, error } = await supabase
     .from("books")
     .insert({
@@ -125,6 +153,7 @@ export async function createBook(insertBook: InsertBook, fileBuffer?: Buffer): P
       file_name: insertBook.fileName,
       file_size: insertBook.fileSize,
       file_path: filePath,
+      thumbnail_path: thumbnailPath || null,
       download_count: 0,
     })
     .select()
