@@ -190,7 +190,7 @@ export class SupabaseStorage implements IStorage {
       }
     }
     
-    // Insert book record
+    // Insert book record (thumbnail_path column may not exist in older schemas)
     const { data, error } = await supabase
       .from("books")
       .insert({
@@ -202,7 +202,6 @@ export class SupabaseStorage implements IStorage {
         file_name: insertBook.fileName,
         file_size: insertBook.fileSize,
         file_path: filePath,
-        thumbnail_path: thumbnailPath || null,
         download_count: 0,
       })
       .select()
