@@ -14,6 +14,7 @@ interface ParsedFormData {
     title?: string;
     author?: string;
     description?: string;
+    category?: string;
   };
   file?: {
     filepath: string;
@@ -43,6 +44,7 @@ async function parseFormData(req: VercelRequest): Promise<ParsedFormData> {
           title: Array.isArray(fields.title) ? fields.title[0] : fields.title,
           author: Array.isArray(fields.author) ? fields.author[0] : fields.author,
           description: Array.isArray(fields.description) ? fields.description[0] : fields.description,
+          category: Array.isArray(fields.category) ? fields.category[0] : fields.category,
         },
         file: file ? {
           filepath: file.filepath,
@@ -77,9 +79,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const title = fields.title;
     const author = fields.author;
     const description = fields.description;
+    const category = fields.category;
 
-    if (!title || !author) {
-      return res.status(400).json({ error: "Missing required fields: title and author are required" });
+    if (!title || !author || !category) {
+      return res.status(400).json({ error: "Missing required fields: title, author, and category are required" });
     }
 
     if (!file) {
@@ -93,6 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title,
         author,
         description: description || null,
+        category,
         fileName: file.originalFilename,
         fileSize: file.size,
       },
