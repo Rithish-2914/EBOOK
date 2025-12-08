@@ -88,6 +88,7 @@ export class MemStorage implements IStorage {
   async deleteBook(id: string): Promise<boolean> {
     const deleted = this.books.delete(id);
     this.fileStore.delete(id);
+    this.fileStore.delete(`${id}_thumb`);
     return deleted;
   }
 
@@ -245,6 +246,15 @@ export class SupabaseStorage implements IStorage {
         .remove([book.filePath]);
       
       if (storageError) console.error("Storage delete error:", storageError);
+    }
+    
+    // Delete thumbnail from storage
+    if (book.thumbnailPath) {
+      const { error: thumbError } = await supabase.storage
+        .from("ebooks")
+        .remove([book.thumbnailPath]);
+      
+      if (thumbError) console.error("Thumbnail delete error:", thumbError);
     }
     
     // Delete book record

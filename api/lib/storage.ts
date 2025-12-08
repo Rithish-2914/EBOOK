@@ -198,6 +198,14 @@ export async function deleteBook(id: string): Promise<boolean> {
     if (storageError) console.error("Storage delete error:", storageError);
   }
   
+  if (book.thumbnailPath) {
+    const { error: thumbError } = await supabase.storage
+      .from("ebooks")
+      .remove([book.thumbnailPath]);
+    
+    if (thumbError) console.error("Thumbnail delete error:", thumbError);
+  }
+  
   const { error } = await supabase
     .from("books")
     .delete()
