@@ -1,6 +1,7 @@
 import { type User, type InsertUser, type Book, type InsertBook } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { supabase, isSupabaseConfigured } from "./supabase";
+import { generateThumbnailFromPdf } from "./pdf-thumbnail";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -154,7 +155,7 @@ export class SupabaseStorage implements IStorage {
     return data ? this.mapDbBookToBook(data) : undefined;
   }
 
-  async createBook(insertBook: InsertBook, fileBuffer?: Buffer, thumbnailBuffer?: Buffer): Promise<Book> {
+  async createBook(insertBook: InsertBook, fileBuffer?: Buffer, _thumbnailBuffer?: Buffer): Promise<Book> {
     if (!supabase) throw new Error("Supabase not configured");
     
     const id = randomUUID();
@@ -173,37 +174,47 @@ export class SupabaseStorage implements IStorage {
       
       if (uploadError) throw uploadError;
       filePath = fileName;
-    }
-    
-    // Upload thumbnail to Supabase Storage
-    if (thumbnailBuffer) {
-      const thumbName = `thumbnails/${id}_thumb.png`;
-      const { error: thumbError } = await supabase.storage
-        .from("ebooks")
-        .upload(thumbName, thumbnailBuffer, {
-          contentType: "image/png",
-          upsert: false,
-        });
       
-      if (!thumbError) {
-        thumbnailPath = thumbName;
+      // Auto-generate thumbnail from PDF first page
+      try {
+        const generatedThumb = await generateThumbnailFromPdf(fileBuffer, 300);
+        const thumbName = `thumbnails/${id}_thumb.png`;
+        const { error: thumbError } = await supabase.storage
+          .from("ebooks")
+          .upload(thumbName, generatedThumb, {
+            contentType: "image/png",
+            upsert: false,
+          });
+        
+        if (!thumbError) {
+          thumbnailPath = thumbName;
+        }
+      } catch (thumbGenError) {
+        console.error("Thumbnail generation failed:", thumbGenError);
       }
     }
     
-    // Insert book record (thumbnail_path column may not exist in older schemas)
+    // Insert book record
+    const insertData: any = {
+      id,
+      title: insertBook.title,
+      author: insertBook.author,
+      description: insertBook.description,
+      category: insertBook.category,
+      file_name: insertBook.fileName,
+      file_size: insertBook.fileSize,
+      file_path: filePath,
+      download_count: 0,
+    };
+    
+    // Only add thumbnail_path if we have one (column may not exist in older schemas)
+    if (thumbnailPath) {
+      insertData.thumbnail_path = thumbnailPath;
+    }
+    
     const { data, error } = await supabase
       .from("books")
-      .insert({
-        id,
-        title: insertBook.title,
-        author: insertBook.author,
-        description: insertBook.description,
-        category: insertBook.category,
-        file_name: insertBook.fileName,
-        file_size: insertBook.fileSize,
-        file_path: filePath,
-        download_count: 0,
-      })
+      .insert(insertData)
       .select()
       .single();
     
